@@ -1,0 +1,20 @@
+{
+  "name": "iipzy_updater",
+  "version": "1.0.0",
+  "author": "Ken Robesky",
+  "license": "ISC",
+  "description": "iipzy appliance updater",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.16.4",
+    "iipzy-shared": "file:../iipzy-shared",
+    "uuid": "^3.3.2"
+  },
+  "devDependencies": {
+    "electron-winstaller": "^3.0.4"
+  }
+}

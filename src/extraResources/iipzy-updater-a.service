@@ -1,0 +1,22 @@
+[Unit]
+Description=Node.js iipzy-updater 
+
+[Service]
+ExecStart=/usr/bin/node /home/pi/iipzy-updater-a/iipzy-updater/src/index.js
+# Required on some systems
+#WorkingDirectory=/home/pi/iipzy-updater-a/iipzy-updater
+Restart=always
+# Restart service after 10 seconds if node service crashes
+RestartSec=10
+# Output to syslog
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=iipzy-updater
+#User=<alternate user>
+User=pi
+#Group=<alternate group>
+Group=pi
+Environment=NODE_ENV=production PORT=8003
+
+[Install]
+WantedBy=multi-user.target

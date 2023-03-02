@@ -1,0 +1,78 @@
+#!/bin/bash /etc/rc.common
+
+START=99
+
+USE_PROCD=1
+
+SERVICE_NAME="iipzy-updater-b"
+SERVICE_COMMAND="/usr/bin/node /home/pi/iipzy-updater-b/iipzy-updater/src/index.js"
+
+service_pidfile="/var/run/$SERVICE_NAME.pid"
+
+kill_children() {
+    local _pid=$1
+    #local _sig=${2:--TERM}
+    local _sig="-9"
+	logger -p user.info -t "$SERVICE_NAME" "killing... $_pid"
+    #kill -stop ${_pid} # needed to stop quickly forking parent from producing children between child killing and parent killing
+    for _child in $(ps -o pid --no-headers --ppid ${_pid}); do
+        kill_children ${_child} ${_sig}
+    done
+    #kill -${_sig} ${_pid}
+}
+
+waitForTimeSet()
+{
+	waiting=0
+
+	EPOCH="UTC 2013"
+	while [[ `date` == *"$EPOCH"* ]]; do
+		if [ $waiting == 0 ]; then
+			logger -p user.info -t "$SERVICE_NAME" "waiting for time to be set"
+			$waiting=1
+		fi
+		sleep 1
+	done
+	if [ $waiting != 0 ]; then
+		logger -p user.info -t "$SERVICE_NAME" "time is set"
+	fi
+}
+
+startService()
+{
+	logger -p user.info -t "$SERVICE_NAME" "starting"
+
+	procd_open_instance
+	procd_set_param command $SERVICE_COMMAND
+	procd_set_param env PATH=/usr/sbin:/usr/bin:/sbin:/bin:/overlay/opt/java-1.8-openjdk/bin
+	procd_set_param respawn 3600 10 0
+	procd_set_param stdout 1 # forward stdout of the command to logd
+	procd_set_param stderr 1 # forward stderr of the command to logd
+	procd_set_param pidfile $service_pidfile
+	procd_close_instance
+
+	logger -p user.info -t "$SERVICE_NAME" "after starting"
+}
+
+start_service() 
+{
+	config_load system
+
+	waitForTimeSet
+
+	startService
+}
+
+stop_service() 
+{
+	logger -p user.info -t "$SERVICE_NAME" "stopping..."
+	if [[ -f "$service_pidfile" ]]; then
+		pid=$(<$service_pidfile)
+		kill_children $pid
+	fi
+}
+
+service_stopped() 
+{
+	logger -p user.info -t "$SERVICE_NAME" "stopped"
+}

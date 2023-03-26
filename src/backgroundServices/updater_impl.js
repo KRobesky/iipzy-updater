@@ -32,7 +32,8 @@ async function updaterInit() {
   log(">>>updaterInit", "updt", "info");
 
   configFile = new ConfigFile(
-    "/home/pi/iipzy-updater-config",
+    //"/home/pi/iipzy-updater-config",
+    "/etc/iipzy",
     "iipzyUpdaterConfig"
   );
   await configFile.init();
@@ -285,25 +286,27 @@ async function updateIipzySentinelAdmin(credentials) {
 }
 
 async function updateIipzySentinelWeb(credentials) {
+  /*
   // install serve if necessary.
   if (!(await fileExistsAsync("/usr/bin/serve"))) {
     setUpdateStatus("installing serve");
     if (!(await doExec("sudo", ["npm", "i", "serve", "-g"], {}, 40)))
       return setUpdateStatusFailed();
   }
+  */
 
   return updateHelper(
     credentials,
     "iipzy-sentinel-web",
     "iipzySentinelWebSuffix",
     "/home/pi/iipzy-sentinel-web-",
-    ["iipzy-shared", "iipzy-sentinel-web"],
+    ["iipzy-sentinel-web-build", "iipzy-sentinel-web"],
     async serviceSuffix => {
       versionInfo.iipzySentinelWeb = await getIipzySentinelWebVersionInfo(
         serviceSuffix
       );
     },
-    true // doBuild
+    true // skipNpmInit
   );
 }
 
@@ -335,7 +338,7 @@ async function updateHelper(
   baseDir_,
   modules,
   updateVersionInfoCB,
-  doBuild,
+  skipNpmInit,
   seppukuStopOldService
 ) {
   log(
@@ -414,23 +417,26 @@ async function updateHelper(
       return setUpdateStatusFailed();
 
     // install
-    setUpdateStatus("installing " + module);
-    if (
-      !(await doExec(
-        "npm",
-        ["i"],
-        {
-          cwd: baseDir + "/" + module
-        },
-        40
-      ))
-    )
-      return setUpdateStatusFailed();
+    if (!skipNpmInit) {
+      setUpdateStatus("installing " + module);
+      if (
+        !(await doExec(
+          "npm",
+          ["i"],
+          {
+            cwd: baseDir + "/" + module
+          },
+          40
+        ))
+      )
+        return setUpdateStatusFailed();
+    }
   }
 
   const oldServiceName = serviceName + "-" + oldServiceSuffix;
   const newServiceName = serviceName + "-" + newServiceSuffix;
 
+    /*
   // npm run build if necessary
   if (doBuild) {
     setUpdateStatus("building " + newServiceName);
@@ -446,6 +452,7 @@ async function updateHelper(
     )
       return setUpdateStatusFailed();
   }
+  */
 
   // check for old service
   setUpdateStatus("checking old service " + oldServiceName);

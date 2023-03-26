@@ -2,12 +2,14 @@
 iipzy-updater.
   For updating iipzy npm modules.
 
-  There are five iipzy related folders under the home directory:
+  There are four iipzy related folders under the home directory:
     ~iipzy-service-a
     ~iipzy-service-b
     ~iipzy-updater-a
     ~iipzy-updater-b
-    ~iipzy-updater-config
+
+  Plus
+    /etc/iipzy/iipzy-updater-config
 
   The purpose of the of iipzy-service-a and iipzy-service-b folders is to provide a means to stage an upgrade 
   while maintaining a running copy of the service.  The same purpose holds for iipzy-updater-a and

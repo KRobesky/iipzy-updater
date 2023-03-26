@@ -71,6 +71,8 @@ const logPath = process.platform === "win32" ? "c:/temp/" : "/var/log/iipzy";
 logInit(logPath, "iipzy-updater");
 const http = require("iipzy-shared/src/services/httpService");
 const { ConfigFile } = require("iipzy-shared/src/utils/configFile");
+const { set_os_id } = require("iipzy-shared/src/utils/globals");
+const { spawnAsync } = require("iipzy-shared/src/utils/spawnAsync");
 const { processErrorHandler, sleep } = require("iipzy-shared/src/utils/utils");
 
 const { updaterInit } = require("./backgroundServices/updater");
@@ -164,6 +166,15 @@ async function main() {
   logLevel = configFile.get("logLevel");
   if (logLevel) setLogLevel(logLevel);
   else configFile.set("logLevel", "info");
+
+  const { stdout, stderr } = await spawnAsync("os-id", []);
+  if (stderr)
+      log("(Error) os-id: stderr = " + stderr, "preq", "error");
+  else
+  {
+    log("main: os_id = " + stdout, "preq", "info");
+    set_os_id(stdout);
+  }
 
   configFile.watch(configWatchCallback);
 

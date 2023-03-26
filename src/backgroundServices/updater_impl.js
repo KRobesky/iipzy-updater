@@ -9,6 +9,7 @@ const {
   fileReadAsync,
   fileStatAsync
 } = require("iipzy-shared/src/utils/fileIO");
+const { get_os_id } = require("iipzy-shared/src/utils/globals");
 const http = require("iipzy-shared/src/services/httpService");
 const { log } = require("iipzy-shared/src/utils/logFile");
 
@@ -18,6 +19,7 @@ let exec = null;
 let execTimeout = null;
 let execError = "";
 let updateStatus = { inProgress: false, step: "done", failed: false };
+let os_id = "";
 
 let versionInfo = {
   iipzyPi: {},
@@ -34,6 +36,8 @@ async function updaterInit() {
     "iipzyUpdaterConfig"
   );
   await configFile.init();
+
+  os_id = get_os_id();
 
   let serviceSuffix = configFile.get("iipzyPiSuffix");
   if (!serviceSuffix) serviceSuffix = "a";
@@ -128,7 +132,7 @@ async function getIipzySentinelWebVersionInfo(serviceSuffix) {
   );
   // iipzySentinelWeb
   let version = null;
-  let vharedVersion = null;
+  let sharedVersion = null;
 
   let packageDotJson = null;
 
@@ -352,7 +356,8 @@ async function updateHelper(
   );
 
   let oldServiceSuffix = configFile.get(configFileKey);
-  if (!oldServiceSuffix) oldServiceSuffix = "b";
+  log("---update oldServiceSuffix = " + oldServiceSuffix);
+  if (!oldServiceSuffix) oldServiceSuffix = "a";
   const newServiceSuffix = oldServiceSuffix === "a" ? "b" : "a";
   const baseDir = baseDir_ + newServiceSuffix;
   log(
@@ -473,23 +478,36 @@ async function updateHelper(
     }
   }
 
+  /*
   [
     "cp",
     "/home/pi/iipzy-service-a/src/extraResources/iipzy-pi-a.service",
     "/etc/systemd/system/."
   ],
     (options = {});
+  */
 
   // copy new service file
   setUpdateStatus("copying new service file for " + newServiceName);
+  let newServiceNameOSSpecific = newServiceName
+  if (os_id === "openwrt") {
+    newServiceNameOSSpecific += "-openwrt";
+  }
+
   const copyCmdFrom =
     baseDir +
     "/" +
     serviceName +
     "/src/extraResources/" +
-    newServiceName +
+    newServiceNameOSSpecific +
     ".service";
-  const copyCmdTo = "/etc/systemd/system/.";
+  let copyCmdTo;
+  if (os_id === "openwrt") {
+    copyCmdTo = "/etc/init.d/" + newServiceName + ".service";
+  } else {
+    copyCmdTo = "/etc/systemd/system/.";
+  }
+  
   if (!(await doExec("sudo", ["cp", copyCmdFrom, copyCmdTo], {}, 10))) {
     // roll back
     await doExec("sudo", ["systemctl", "enable", oldServiceName], {}, 10);

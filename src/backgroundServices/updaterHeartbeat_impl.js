@@ -17,7 +17,7 @@ async function updaterHeartbeatInit(configFile_) {
     updaterHeartbeat();
   }, 20 * 1000);
 
-  await updaterHeartbeat_helper();
+  //await updaterHeartbeat_helper();
 }
 
 async function updaterHeartbeat() {
@@ -28,43 +28,48 @@ async function updaterHeartbeat() {
   }
 }
 
+let inUpdaterHeartbeatHelper = false;
+
 async function updaterHeartbeat_helper() {
-  log("updaterHeartbeat", "htbt", "info");
+  try {
+    log(">>>updaterHeartbeat_helper", "htbt", "info");
+    if (inUpdaterHeartbeatHelper) return true;
 
-  if (!clientToken) {
-    clientToken = configFile.get("clientToken");
-    if (clientToken) http.setClientTokenHeader(clientToken);
-    // no client token yet.
-    else return false;
-  }
-
-  log("updaterHeartbeat: sending heartbeat", "htbt", "info");
-  const { data: updateResponse, status: statusResponse } = await http.post(
-    "/updater/heartbeat",
-    {
-      data: {
-        versionInfo: getVersionInfo(),
-        updateStatus: getUpdateStatus()
-      }
+    inUpdaterHeartbeatHelper = true;
+    if (!clientToken) {
+      clientToken = configFile.get("clientToken");
+      if (clientToken) http.setClientTokenHeader(clientToken);
+      // no client token yet.
+      else return false;
     }
-  );
-  log(
-    "updaterHeartbeat: AFTER sending heartbeat: status = " + statusResponse,
-    "htbt",
-    "info"
-  );
 
-  if (updateResponse && updateResponse.starting) {
+    log("updaterHeartbeat: sending heartbeat", "htbt", "info");
+    const { data: updateResponse, status: statusResponse } = await http.post(
+      "/updater/heartbeat",
+      {
+        data: {
+          versionInfo: getVersionInfo(),
+          updateStatus: getUpdateStatus()
+        }
+      }
+    );
     log(
-      "/updater/heartbeat: response = " +
-        JSON.stringify(updateResponse.params, null, 2),
+      "updaterHeartbeat: AFTER sending heartbeat: status = " + statusResponse + ", response = " + JSON.stringify(updateResponse, null, 2),
       "htbt",
       "info"
     );
-    await update(updateResponse.params);
-  }
 
-  return statusResponse === Defs.httpStatusOk;
+    if (updateResponse && updateResponse.starting) {
+      await update(updateResponse.params);
+    }
+
+    return statusResponse === Defs.httpStatusOk;
+  } catch(ex) {
+    log("Exception) updaterHeartbeat_helper: " + ex, "updt", "error");
+  } finally {
+    inUpdaterHeartbeatHelper = false;
+    log("<<<updaterHeartbeat_helper", "updt", "info");    
+  }
 }
 
 module.exports = { updaterHeartbeatInit };

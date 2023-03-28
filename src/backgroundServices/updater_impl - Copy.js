@@ -12,6 +12,7 @@ const {
 const { get_os_id } = require("iipzy-shared/src/utils/globals");
 const http = require("iipzy-shared/src/services/httpService");
 const { log } = require("iipzy-shared/src/utils/logFile");
+const { json } = require("express");
 
 let configFile = null;
 
@@ -62,7 +63,7 @@ async function updaterInit() {
 
   log("updaterInit: " + JSON.stringify(versionInfo, null, 2), "updt", "info");
   await sendUpdateVersionInfo();
-  await sendUpdateStatus();
+  sendUpdateStatus();
 
   log("<<<updaterInit", "updt", "info");
 }
@@ -248,17 +249,17 @@ async function setUpdateStatus(step) {
   await sendUpdateStatus();
 }
 
-//TODO send to server
-async function setUpdateStatusFailed() {
+function setUpdateStatusFailed() {
   updateStatus.failed = true;
   updateStatus.timestamp = new Date().toLocaleString();
   updateStatus.error = execError;
   updateStatus.inProgress = false;
+  log("setUpdateStatusFailed: updateStatus = " + JSON.stringify(updateStatus));
   await sendUpdateStatus();
 }
 
 async function updateIipzyPi(credentials) {
-  return await updateHelper(
+  return updateHelper(
     credentials,
     "iipzy-pi",
     "iipzyPiSuffix",
@@ -271,7 +272,7 @@ async function updateIipzyPi(credentials) {
 }
 
 async function updateIipzySentinelAdmin(credentials) {
-  return await updateHelper(
+  return updateHelper(
     credentials,
     "iipzy-sentinel-admin",
     "iipzySentinelAdminSuffix",
@@ -295,7 +296,7 @@ async function updateIipzySentinelWeb(credentials) {
   }
   */
 
-  return await updateHelper(
+  return updateHelper(
     credentials,
     "iipzy-sentinel-web",
     "iipzySentinelWebSuffix",
@@ -311,7 +312,7 @@ async function updateIipzySentinelWeb(credentials) {
 }
 
 async function updateIipzyUpdater(credentials) {
-  return await updateHelper(
+  return updateHelper(
     credentials,
     "iipzy-updater",
     "iipzyUpdaterSuffix",
@@ -342,7 +343,7 @@ async function updateHelper(
   seppukuStopOldService
 ) {
   log(
-    "updateHelper " +
+    "update " +
       serviceName +
       " - credentials: " +
       credentials +
@@ -352,18 +353,24 @@ async function updateHelper(
       baseDir_ +
       ", modules: " +
       JSON.stringify(modules) +
+      ", skipNpmInit: " +
+      skipNpmInit +
       ", seppuku: " +
       seppukuStopOldService,
     "updt",
     "info"
   );
 
-  // determine target of update
-  const stat_a = await fileStatAsync(baseDir_ + "a");
-  log("update - stat_a: " + JSON.stringify(stat_a, null, 2), "updt", "info");
-  const stat_b = await fileStatAsync(baseDir_ + "b");
-  log("update - stat_b: " + JSON.stringify(stat_b, null, 2), "updt", "info");
+  // e.g., update iipzy-pi - credentials: https://github.com/KRobesky/, configKey: iipzyPiSuffix, baseDir: /home/pi/iipzy-service-, modules: ["iipzy-shared","iipzy-pi"], seppuku: undefined
 
+
+  // determine target of update
+  const stat_a = await fileStatAsync(baseDir + "a");
+  log("update - stat_a: " + json.stringify(stat_a, null, 2), "updt", "info");
+  const stat_b = await fileStatAsync(baseDir + "b");
+  log("update - stat_b: " + json.stringify(stat_b, null, 2), "updt", "info");
+
+  
   let oldServiceSuffix = configFile.get(configFileKey);
   log("---update oldServiceSuffix = " + oldServiceSuffix);
   if (!oldServiceSuffix) oldServiceSuffix = "a";
@@ -380,14 +387,14 @@ async function updateHelper(
   );
 
   updateStatus.target = baseDir;
-  await setUpdateStatus("removing old " + baseDir);
+  setUpdateStatus("removing old " + baseDir);
   if (!(await doExec("rm", ["-r", "-f", baseDir], {}, 10)))
-    return await setUpdateStatusFailed();
+    return setUpdateStatusFailed();
 
   // create baseDir
-  await setUpdateStatus("creating new " + baseDir);
+  setUpdateStatus("creating new " + baseDir);
   if (!(await doExec("mkdir", [baseDir], {}, 10)))
-    return await setUpdateStatusFailed();
+    return setUpdateStatusFailed();
 
   // credentials look like. "http://<username>:<password>@<url>/Bonobo.Git.Server/"
 
@@ -395,7 +402,7 @@ async function updateHelper(
   for (let i = 0; i < modules.length; i++) {
     const module = modules[i];
     // clone
-    await setUpdateStatus("cloning " + module);
+    setUpdateStatus("cloning " + module);
     if (
       !(await doExec(
         "git",
@@ -406,10 +413,10 @@ async function updateHelper(
         40
       ))
     )
-      return await setUpdateStatusFailed();
+      return setUpdateStatusFailed();
 
     // disable package-lock
-    await setUpdateStatus("disabling " + module + " package-lock");
+    setUpdateStatus("disabling " + module + " package-lock");
     if (
       !(await doExec(
         "npm",
@@ -420,11 +427,11 @@ async function updateHelper(
         5
       ))
     )
-      return await setUpdateStatusFailed();
+      return setUpdateStatusFailed();
 
     // install
     if (!skipNpmInit) {
-      await setUpdateStatus("installing " + module);
+      setUpdateStatus("installing " + module);
       if (
         !(await doExec(
           "npm",
@@ -435,7 +442,7 @@ async function updateHelper(
           40
         ))
       )
-        return await setUpdateStatusFailed();
+        return setUpdateStatusFailed();
     }
   }
 
@@ -461,7 +468,7 @@ async function updateHelper(
   */
 
   // check for old service
-  await setUpdateStatus("checking old service " + oldServiceName);
+  setUpdateStatus("checking old service " + oldServiceName);
   const oldServiceExists = await doExec(
     "sudo",
     ["systemctl", "status", oldServiceName],
@@ -472,22 +479,22 @@ async function updateHelper(
   if (oldServiceExists) {
     // stop old service
     if (!seppukuStopOldService) {
-      await setUpdateStatus("stopping old service " + oldServiceName);
+      setUpdateStatus("stopping old service " + oldServiceName);
       if (
         !(await doExec("sudo", ["systemctl", "stop", oldServiceName], {}, 10))
       )
-        return await setUpdateStatusFailed();
+        return setUpdateStatusFailed();
     }
 
     // disable old service
-    await setUpdateStatus("disabling old service " + oldServiceName);
+    setUpdateStatus("disabling old service " + oldServiceName);
     if (
       !(await doExec("sudo", ["systemctl", "disable", oldServiceName], {}, 10))
     ) {
       // roll back
       await doExec("sudo", ["systemctl", "start", oldServiceName], {}, 10);
 
-      return await setUpdateStatusFailed();
+      return setUpdateStatusFailed();
     }
   }
 
@@ -501,7 +508,7 @@ async function updateHelper(
   */
 
   // copy new service file
-  await setUpdateStatus("copying new service file for " + newServiceName);
+  setUpdateStatus("copying new service file for " + newServiceName);
   let newServiceNameOSSpecific = newServiceName
   if (os_id === "openwrt") {
     newServiceNameOSSpecific += "-openwrt";
@@ -526,21 +533,21 @@ async function updateHelper(
     await doExec("sudo", ["systemctl", "enable", oldServiceName], {}, 10);
     await doExec("sudo", ["systemctl", "start", oldServiceName], {}, 10);
 
-    return await setUpdateStatusFailed();
+    return setUpdateStatusFailed();
   }
 
   // daemon-reload
-  await setUpdateStatus("executing daemon-reload on services");
+  setUpdateStatus("executing daemon-reload on services");
   if (!(await doExec("sudo", ["systemctl", "daemon-reload"], {}, 10))) {
     // roll back
     await doExec("sudo", ["systemctl", "enable", oldServiceName], {}, 10);
     await doExec("sudo", ["systemctl", "start", oldServiceName], {}, 10);
 
-    return await setUpdateStatusFailed();
+    return setUpdateStatusFailed();
   }
 
   // enable new service
-  await setUpdateStatus("enabling new service " + newServiceName);
+  setUpdateStatus("enabling new service " + newServiceName);
   if (
     !(await doExec("sudo", ["systemctl", "enable", newServiceName], {}, 10))
   ) {
@@ -548,22 +555,22 @@ async function updateHelper(
     await doExec("sudo", ["systemctl", "enable", oldServiceName], {}, 10);
     await doExec("sudo", ["systemctl", "start", oldServiceName], {}, 10);
 
-    return await setUpdateStatusFailed();
+    return setUpdateStatusFailed();
   }
 
   // start new service
-  await setUpdateStatus("starting new service " + newServiceName);
+  setUpdateStatus("starting new service " + newServiceName);
   if (!(await doExec("sudo", ["systemctl", "start", newServiceName], {}, 10))) {
     // roll back
     await doExec("sudo", ["systemctl", "disable", newServiceName], {}, 10);
     await doExec("sudo", ["systemctl", "enable", oldServiceName], {}, 10);
     await doExec("sudo", ["systemctl", "start", oldServiceName], {}, 10);
 
-    return await setUpdateStatusFailed();
+    return setUpdateStatusFailed();
   }
 
   // get status of new service
-  await setUpdateStatus("get status of new service " + newServiceName);
+  setUpdateStatus("get status of new service " + newServiceName);
   if (
     !(await doExec("sudo", ["systemctl", "status", newServiceName], {}, 10))
   ) {
@@ -573,7 +580,7 @@ async function updateHelper(
     await doExec("sudo", ["systemctl", "enable", oldServiceName], {}, 10);
     await doExec("sudo", ["systemctl", "start", oldServiceName], {}, 10);
 
-    return await setUpdateStatusFailed();
+    return setUpdateStatusFailed();
   }
 
   // update config file
@@ -588,18 +595,13 @@ async function updateHelper(
   // NB: special case for updater.  Updater cannot be stopped during update.
   if (oldServiceExists && seppukuStopOldService) {
     log("stopping old service - Seppuku!", "updt", "info");
-    await setUpdateStatus("stopping old service " + oldServiceName);
+    setUpdateStatus("stopping old service " + oldServiceName);
     if (!(await doExec("sudo", ["systemctl", "stop", oldServiceName], {}, 10)))
-      return await setUpdateStatusFailed();
+      return setUpdateStatusFailed();
   }
 }
 
 async function update(updateParams) {
-  log(
-    "update - updateParams: " + JSON.stringify(updateParams, null, 2),
-    "updt",
-    "info"
-  );
   log(
     "update - updateStatus: " + JSON.stringify(updateStatus, null, 2),
     "updt",
@@ -608,8 +610,6 @@ async function update(updateParams) {
 
   if (updateStatus.step !== "done" && !updateStatus.failed)
     return { status: Defs.statusUpdateInProgress };
-
-  log("update - starting", "updt", "info");
 
   updateStatus = {
     inProgress: true,
@@ -622,23 +622,23 @@ async function update(updateParams) {
     failed: false
   };
 
-  await sendUpdateStatus();
+  sendUpdateStatus();
 
   switch (updateParams.updateType) {
     case "iipzy-pi": {
-      await updateIipzyPi(updateParams.credentials);
+      updateIipzyPi(updateParams.credentials);
       break;
     }
     case "iipzy-sentinel-admin": {
-      await updateIipzySentinelAdmin(updateParams.credentials);
+      updateIipzySentinelAdmin(updateParams.credentials);
       break;
     }
     case "iipzy-sentinel-web": {
-      await updateIipzySentinelWeb(updateParams.credentials);
+      updateIipzySentinelWeb(updateParams.credentials);
       break;
     }
     case "iipzy-updater": {
-      await updateIipzyUpdater(updateParams.credentials);
+      updateIipzyUpdater(updateParams.credentials);
       break;
     }
     default:
@@ -648,7 +648,7 @@ async function update(updateParams) {
 }
 
 async function sendUpdateStatus() {
-  log("sendUpdateStatus: " + JSON.stringify(updateStatus, null, 2), "updt", "info");
+  log("sendUpdateStatus: " + updateStatus.step, "updt", "info");
   const { data, status } = await http.post("/updater/status", {
     data: {
       updateStatus
@@ -670,7 +670,6 @@ async function sendUpdateVersionInfo() {
 }
 
 function getUpdateStatus() {
-  log("getUpdateStatus: " + JSON.stringify(updateStatus, null, 2), "updt", "info");
   return updateStatus;
 }
 

@@ -2,65 +2,67 @@
 iipzy-updater.
   For updating iipzy npm modules.
 
-  There are four iipzy related folders under the home directory:
-    ~iipzy-service-a
-    ~iipzy-service-b
-    ~iipzy-updater-a
-    ~iipzy-updater-b
+  There are eight iipzy related folders under the /home/pi directory:
+    iipzy-sentinel-admin-a
+    iipzy-sentinel-admin-b
+    iipzy-sentinel-web-a
+    iipzy-sentinel-web-b
+    iipzy-service-a
+    iipzy-service-b
+    iipzy-updater-a
+    iipzy-updater-b
 
-  Plus
-    /etc/iipzy/iipzy-updater-config
+  The purpose of the of "-a" and "-b" folders is to provide a means to stage an upgrade 
+  while maintaining a running copy of the service.
 
-  The purpose of the of iipzy-service-a and iipzy-service-b folders is to provide a means to stage an upgrade 
-  while maintaining a running copy of the service.  The same purpose holds for iipzy-updater-a and
-  iipzy-updater-b folders.
-
-  There are also two /etc/systemd/system service files:
+  There are also eight /etc/init.d/ or /etc/systemd/system service files:
+    iipzy-sentinel-admin-a.service
+    iipzy-sentinel-admin-b.service
+    iipzy-sentinel-web-a.service
+    iipzy-sentinel-web-b.service
     iipzy-pi-a.service
-    iipzy-pi-b.service
-
-    Each points to the corresponding ~iipzy-service-[a|b] folder.
-
-  There are also two service files for iipzy-updater:
+    iipzy-p-b.service
     iipzy-updater-a.service
     iipzy-updater-b.service
- 
-    Each points to the corresponding ~iipzy-updater-[a|b] folder.
 
-    This allows the updater to be updated independently of the iipzy-pi service
+    Each points to the corresponding /home/pi/...-[a|b] folder.
 
   The updater service sends a updater-heartbeat request to the iipzy-server.   This occurs every 20 seconds;
   the time period is controlled by the server.
 
   If an upgrade is indicated, by the response to the updater-heartbeat request, the following happens:
 
-    1.  The iipzy-service-a or iipzy-service-b folder that is not currently in use, is removed, and a new, 
-        empty, folder is created in its place.  For sake of discussion, let's say iipzy-service-b is the 
-        folder where the install takes place.
+    1.  The selection of the "-a" or "-b" folder to install to is determined as follows: if a folder is empty,
+        that folder is used, otherwise the folder with the older contents is used.
 
-    2.  Using credentials returned in the updater-heartbeat response, updater git clones the following folders:
+    2.  The contents of the folder selected for installation is removed, and a new, empty, folder is created in its place.  
+        
+        For sake of discussion, let's say iipzy-service-b is the folder where the install takes place.
+
+    3.  Using credentials returned in the updater-heartbeat response, updater git clones the following folders:
           cd ~/iipzy-service-b
           git clone http://.../iipzy-shared.git
-          git clone http://.../iipzy-client-shared.git
           git clone http://.../iipzy-pi.git
 
-    3.  The three new folders are npm installed
+    4.  The two new folders are npm installed
           cd ~/iipzy-service-b/iipzy-shared
-          npm i
-          cd ~/iipzy-service-b/iipzy-client-shared
           npm i
           cd ~/iipzy-service-b/iipzy-pi
           npm i
 
-    4.  The currenty running iipzy-pi service is stopped
+    5.  The currenty running iipzy-pi service is stopped and disabled
 
           systemctl stop iipzy-pi-a
 
-    5.  The newly installed iipzy-pi service is started
+    6.  The newly installed iipzy-pi service is enabled and started
 
           systemctl start iipzy-pi-b
 
-    6.  ...TODO... more info.
+    7.  If the update fails, the service for the newly installed version is stopped and disabled.  
+        The service for the previous version is enabled and started.
+        The newly installed folders are deleted.
+
+    For iipzy-sentinel-web, the runnable build directory from iipzy-sentinel-web-build is cloned.
 */
 const express = require("express");
 const app = express();

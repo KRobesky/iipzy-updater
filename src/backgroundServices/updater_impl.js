@@ -12,6 +12,7 @@ const {
 const { get_os_id } = require("iipzy-shared/src/utils/globals");
 const http = require("iipzy-shared/src/services/httpService");
 const { log } = require("iipzy-shared/src/utils/logFile");
+const { sleep } = require("iipzy-shared/src/utils/utils");
 
 let configFile = null;
 
@@ -31,156 +32,123 @@ let versionInfo = {
 async function updaterInit() {
   log(">>>updaterInit", "updt", "info");
 
+    /*
   configFile = new ConfigFile(
     //"/home/pi/iipzy-updater-config",
     "/etc/iipzy",
     "iipzyUpdaterConfig"
   );
   await configFile.init();
+  */
 
   os_id = get_os_id();
 
-  let serviceSuffix = configFile.get("iipzyPiSuffix");
-  if (!serviceSuffix) serviceSuffix = "a";
-  versionInfo.iipzyPi = await getIipzyPiVersionInfo(serviceSuffix);
-
-  serviceSuffix = configFile.get("iipzySentinelAdminSuffix");
-  if (!serviceSuffix) serviceSuffix = "a";
-  versionInfo.iipzySentinelAdmin = await getIipzySentinelAdminVersionInfo(
-    serviceSuffix
-  );
-
-  serviceSuffix = configFile.get("iipzySentinelWebSuffix");
-  if (!serviceSuffix) serviceSuffix = "a";
-  versionInfo.iipzySentinelWeb = await getIipzySentinelWebVersionInfo(
-    serviceSuffix
-  );
-
-  serviceSuffix = configFile.get("iipzyUpdaterSuffix");
-  if (!serviceSuffix) serviceSuffix = "a";
-  versionInfo.iipzyUpdater = await getIipzyUpdaterVersionInfo(serviceSuffix);
-
+  versionInfo.iipzyPi = await getIipzyPiVersionInfo();
+  versionInfo.iipzySentinelAdmin = await getIipzySentinelAdminVersionInfo();
+  versionInfo.iipzySentinelWeb = await getIipzySentinelWebVersionInfo();
+  versionInfo.iipzyUpdater = await getIipzyUpdaterVersionInfo();
   log("updaterInit: " + JSON.stringify(versionInfo, null, 2), "updt", "info");
+
   await sendUpdateVersionInfo();
   await sendUpdateStatus();
 
   log("<<<updaterInit", "updt", "info");
 }
 
-async function getIipzyPiVersionInfo(serviceSuffix) {
-  log("getIipzyPiVersionInfo: suffix = " + serviceSuffix, "updt", "info");
-  // iipzy Sentinel
+function isEmpty(object) {
+  return (JSON.stringify(object) === '{}');
+}
+
+async function getServiceSuffixes(service) {
+  log("getServiceSuffixes: service = " + service, "updt", "info");
+
+  const baseDir = "/home/pi/" + service + "-";
+  // e.g.: /home/pi/iipzy-sentinel-admin-",
+  log("getServiceSuffixes: baseDir = " + baseDir, "updt", "info");
+  const stat_a = await fileStatAsync(baseDir + "a");
+  log("getServiceSuffixes - stat_a: " + JSON.stringify(stat_a, null, 2), "updt", "info");
+  const stat_b = await fileStatAsync(baseDir + "b");
+  log("getServiceSuffixes - stat_b: " + JSON.stringify(stat_b, null, 2), "updt", "info");
+  let stat_a_timestampEpoch = 0;
+  if (!isEmpty(stat_a)) stat_a_timestampEpoch = stat_a.birthtimeMs;
+  let stat_b_timestampEpoch = 0;
+  if (!isEmpty(stat_b)) stat_b_timestampEpoch = stat_b.birthtimeMs;
+  log("getServiceSuffixes: a_ts = " + stat_a_timestampEpoch + ", b_ts = " + stat_b_timestampEpoch, "updt", "info");
+  return {
+    curServiceSuffix : (stat_a_timestampEpoch > stat_b_timestampEpoch) ? "a" : "b",
+    nextServiceSuffix : (stat_a_timestampEpoch > stat_b_timestampEpoch) ? "b" : "a"
+  }
+}
+
+async function getServiceVersionInfo(service, modules) {
+  log("getServiceVersionInfo: service = " + service + ", modules = " + JSON.stringify(modules), "updt", "info");
+  
   let version = null;
   let sharedVersion = null;
+  let updateTime = null;
 
-  let packageDotJson = null;
+  try{
+  const suffixes = await getServiceSuffixes(service);
+    log("getServiceVersionInfo: suffixes = " + JSON.stringify(suffixes));
 
-  const baseDir = "/home/pi/iipzy-service-" + serviceSuffix;
+    const baseDir = "/home/pi/" + service + "-" + suffixes.curServiceSuffix + "/";
+    log("getServiceVersionInfo: baseDir = " + baseDir, "updt", "info");
+    // e.g. /home/pi/iipzy-service-a
 
-  packageDotJson = JSON.parse(
-    await fileReadAsync(baseDir + "/iipzy-pi/package.json")
-  );
-  if (packageDotJson) version = packageDotJson.version;
-  packageDotJson = JSON.parse(
-    await fileReadAsync(baseDir + "/iipzy-shared/package.json")
-  );
-  if (packageDotJson) sharedVersion = packageDotJson.version;
-  const stat = await fileStatAsync(baseDir + "/iipzy-pi/package.json");
+    for (let i = 0; i < modules.length; i++) {
+      const modulePath = baseDir + modules[i] + "/package.json";
+      //e.g.,  /home/pi/iipzy-service-a/iipzy-pi/packages.json
+      log("getServiceVersionInfo: modulePath = " + modulePath, "updt", "info");  
+      
+      const packageDotJson = JSON.parse(await fileReadAsync(modulePath));
+      if (packageDotJson) {
+        if (modulePath.includes("shared"))
+          sharedVersion = packageDotJson.version;
+        else {
+          version = packageDotJson.version;
+          try {
+            const stat = await fileStatAsync(modulePath);
+            updateTime = Math.round(stat.ctimeMs);
+          } catch (ex) {}
+        } 
+      }
+    }
+  } catch (ex) {
+    log( "(Exception) getServiceVersionInfo: " + ex);
+  }
+
+  log( "getServiceVersionInfo: version = " + version + ", sharedVersion = " + sharedVersion);
+
   return {
     version,
     sharedVersion,
-    updateTime: Math.round(stat.ctimeMs)
+    updateTime
   };
 }
 
-async function getIipzySentinelAdminVersionInfo(serviceSuffix) {
-  log(
-    "getIipzySentinelAdminVersionInfo: suffix = " + serviceSuffix,
-    "updt",
-    "info"
-  );
+
+async function getIipzyPiVersionInfo() {
+  log("getIipzyPiVersionInfo", "updt", "info");
+   // iipzy Sentinel
+  return await getServiceVersionInfo("iipzy-service", ["iipzy-pi", "iipzy-shared"]);
+}
+
+async function getIipzySentinelAdminVersionInfo() {
+  log("getIipzySentinelAdminVersionInfo", "updt", "info");
   // iipzySentinelAdmin
-  let version = null;
-  let sharedVersion = null;
-
-  let packageDotJson = null;
-
-  const baseDir = "/home/pi/iipzy-sentinel-admin-" + serviceSuffix;
-
-  packageDotJson = JSON.parse(
-    await fileReadAsync(baseDir + "/iipzy-sentinel-admin/package.json")
-  );
-  if (packageDotJson) version = packageDotJson.version;
-  packageDotJson = JSON.parse(
-    await fileReadAsync(baseDir + "/iipzy-shared/package.json")
-  );
-  if (packageDotJson) sharedVersion = packageDotJson.version;
-  const stat = await fileStatAsync(
-    baseDir + "/iipzy-sentinel-admin/package.json"
-  );
-  return {
-    version,
-    sharedVersion,
-    updateTime: Math.round(stat.ctimeMs)
-  };
+  return await getServiceVersionInfo("iipzy-sentinel-admin", ["iipzy-sentinel-admin", "iipzy-shared"]);
 }
 
-async function getIipzySentinelWebVersionInfo(serviceSuffix) {
-  log(
-    "getIipzySentinelWebVersionInfo: suffix = " + serviceSuffix,
-    "updt",
-    "info"
-  );
+async function getIipzySentinelWebVersionInfo() {
+  log("getIipzySentinelWebVersionInfo", "updt", "info");
   // iipzySentinelWeb
-  let version = null;
-  let sharedVersion = null;
-
-  let packageDotJson = null;
-
-  const baseDir = "/home/pi/iipzy-sentinel-web-" + serviceSuffix;
-
-  packageDotJson = JSON.parse(
-    await fileReadAsync(baseDir + "/iipzy-sentinel-web/package.json")
-  );
-  if (packageDotJson) version = packageDotJson.version;
-  packageDotJson = JSON.parse(
-    await fileReadAsync(baseDir + "/iipzy-shared/package.json")
-  );
-  if (packageDotJson) sharedVersion = packageDotJson.version;
-  const stat = await fileStatAsync(
-    baseDir + "/iipzy-sentinel-web/package.json"
-  );
-  return {
-    version,
-    sharedVersion,
-    updateTime: Math.round(stat.ctimeMs)
-  };
+  return await getServiceVersionInfo("iipzy-sentinel-web", ["iipzy-sentinel-web", "iipzy-shared"]);
 }
 
 async function getIipzyUpdaterVersionInfo(serviceSuffix) {
-  log("getIipzyUpdaterVersionInfo: suffix = " + serviceSuffix, "updt", "info");
+  log("getIipzyUpdaterVersionInfo", "updt", "info");
   // iipzyUpdater
-  let version = null;
-  let sharedVersion = null;
-
-  let packageDotJson = null;
-
-  const baseDir = "/home/pi/iipzy-updater-" + serviceSuffix;
-
-  packageDotJson = JSON.parse(
-    await fileReadAsync(baseDir + "/iipzy-updater/package.json")
-  );
-  if (packageDotJson) version = packageDotJson.version;
-  packageDotJson = JSON.parse(
-    await fileReadAsync(baseDir + "/iipzy-shared/package.json")
-  );
-  if (packageDotJson) sharedVersion = packageDotJson.version;
-  const stat = await fileStatAsync(baseDir + "/iipzy-updater/package.json");
-  return {
-    version,
-    sharedVersion,
-    updateTime: Math.round(stat.ctimeMs)
-  };
+  return await getServiceVersionInfo("iipzy-updater", ["iipzy-updater", "iipzy-shared"]);
 }
 
 function doExecHelper(command, params, options, timeoutMins, callback) {
@@ -300,7 +268,7 @@ async function updateIipzySentinelWeb(credentials) {
     "iipzy-sentinel-web",
     "iipzySentinelWebSuffix",
     "/home/pi/iipzy-sentinel-web-",
-    ["iipzy-sentinel-web-build", "iipzy-sentinel-web"],
+    ["iipzy-sentinel-web"],
     async serviceSuffix => {
       versionInfo.iipzySentinelWeb = await getIipzySentinelWebVersionInfo(
         serviceSuffix
@@ -359,15 +327,10 @@ async function updateHelper(
   );
 
   // determine target of update
-  const stat_a = await fileStatAsync(baseDir_ + "a");
-  log("update - stat_a: " + JSON.stringify(stat_a, null, 2), "updt", "info");
-  const stat_b = await fileStatAsync(baseDir_ + "b");
-  log("update - stat_b: " + JSON.stringify(stat_b, null, 2), "updt", "info");
+  const suffixes = await getServiceSuffixes(serviceName);
+  const oldServiceSuffix = suffixes.curServiceSuffix;
+  const newServiceSuffix = suffixes.nextServiceSuffix;
 
-  let oldServiceSuffix = configFile.get(configFileKey);
-  log("---update oldServiceSuffix = " + oldServiceSuffix);
-  if (!oldServiceSuffix) oldServiceSuffix = "a";
-  const newServiceSuffix = oldServiceSuffix === "a" ? "b" : "a";
   const baseDir = baseDir_ + newServiceSuffix;
   log(
     serviceName +
@@ -576,8 +539,10 @@ async function updateHelper(
     return await setUpdateStatusFailed();
   }
 
+  /*
   // update config file
   await configFile.set(configFileKey, newServiceSuffix);
+  */
 
   await updateVersionInfoCB(newServiceSuffix);
 

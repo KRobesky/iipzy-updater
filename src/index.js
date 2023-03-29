@@ -183,8 +183,9 @@ async function main() {
   configFile.watch(configWatchCallback);
 
   await updaterHeartbeatInit(configFile);
-  await updaterInit();
 
+  await updaterInit();
+  
   createServer();
 }
 

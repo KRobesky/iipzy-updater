@@ -169,7 +169,6 @@ async function main() {
 
   logLevel = configFile.get("logLevel");
   if (logLevel) setLogLevel(logLevel);
-  else configFile.set("logLevel", "info");
 
   const { stdout, stderr } = await spawnAsync("os-id", []);
   if (stderr)

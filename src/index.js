@@ -89,53 +89,18 @@ require("./startup/routes")(app);
 const userDataPath = "/etc/iipzy";
 let configFile = null;
 
-let serverAddress = undefined;
-let clientToken = undefined;
 let logLevel = undefined;
 
 let server = null;
 
-// function createServer() {
-//   try {
-//     const port = 8003;
-//     server = https
-//       .createServer(
-//         {
-//           key: fs.readFileSync(__dirname + "/certificate/server.key"),
-//           cert: fs.readFileSync(__dirname + "/certificate/server.cert")
-//         },
-//         app
-//       )
-//       .listen(port, () => {
-//         log(`Listening on port ${port}...`, "strt");
-//       });
-//   } catch (ex) {
-//     log("(Exception) main: " + ex, "strt", "info");
-//     return false;
-//   }
-//   return true;
-// }
-
 let createServerTries = 6;
 function createServer() {
   log("createServer", "strt", "info");
-  const port = 8003;
-  // server = https
-  //   .createServer(
-  //     {
-  //       key: fs.readFileSync(__dirname + "/certificate/server.key"),
-  //       cert: fs.readFileSync(__dirname + "/certificate/server.cert")
-  //     },
-  //     app
-  //   )
-  //   .listen(port, () => {
-  //     log(`Listening on port ${port}...`, "strt");
-  //   })
 
   server = http_
     .createServer(app)
-    .listen(port, () => {
-      log(`Listening on port ${port}...`, "main", "info");
+    .listen(Defs.port_sentinel_updater, () => {
+      log(`Listening on port ${Defs.port_sentinel_updater}...`, "main", "info");
     })
     .on("error", async err => {
       log("(Exception) createServer: code = " + err.code, "strt", "info");
@@ -162,13 +127,20 @@ async function main() {
   configFile = new ConfigFile(userDataPath, Defs.configFilename);
   await configFile.init();
 
-  serverAddress = configFile.get("serverAddress");
-  http.setBaseURL(serverAddress);
-
-  clientToken = configFile.get("clientToken");
-
   logLevel = configFile.get("logLevel");
   if (logLevel) setLogLevel(logLevel);
+  
+  http.setBaseURL(configFile.get("serverAddress") + ":" + Defs.port_server);
+
+  // wait forever to get a client token.
+  while (true) {
+    const clientToken_ = configFile.get("clientToken");
+    if (clientToken) {
+      http.setClientTokenHeader(clientToken);
+      break;
+    }
+    await sleep(1000);
+  }
 
   const { stdout, stderr } = await spawnAsync("os-id", []);
   if (stderr)
@@ -194,41 +166,6 @@ main();
 
 function configWatchCallback() {
   log("configWatchCallback", "main", "info");
-
-  // handle server address change.
-  const serverAddress_ = configFile.get("serverAddress");
-  if (serverAddress_ !== serverAddress) {
-    log(
-      "configWatchCallback: serverAddress change: old = " +
-        serverAddress +
-        ", new = " +
-        serverAddress_,
-      "main",
-      "info"
-    );
-
-    if (serverAddress_) {
-      serverAddress = serverAddress_;
-      http.setBaseURL(serverAddress);
-    }
-  }
-
-  clientToken_ = configFile.get("clientToken");
-  if (clientToken_ !== clientToken) {
-    log(
-      "configWatchCallback: clientToken change: old = " +
-        clientToken +
-        ", new = " +
-        clientToken_,
-      "main",
-      "info"
-    );
-
-    if (clientToken_) {
-      clientToken = clientToken_;
-      http.setClientTokenHeader(clientToken);
-    }
-  }
 
   // handle log level change.
   const logLevel_ = configFile.get("logLevel");

@@ -129,18 +129,18 @@ async function main() {
 
   logLevel = configFile.get("logLevel");
   if (logLevel) setLogLevel(logLevel);
-  
-  http.setBaseURL(configFile.get("serverAddress") + ":" + Defs.port_server);
-
+ 
   // wait forever to get a client token.
   while (true) {
-    const clientToken_ = configFile.get("clientToken");
+    const clientToken = configFile.get("clientToken");
     if (clientToken) {
       http.setClientTokenHeader(clientToken);
       break;
     }
     await sleep(1000);
   }
+  
+  http.setBaseURL(configFile.get("serverAddress") + ":" + Defs.port_server);
 
   const { stdout, stderr } = await spawnAsync("os-id", []);
   if (stderr)

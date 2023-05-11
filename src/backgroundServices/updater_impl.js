@@ -55,27 +55,29 @@ async function updaterInit() {
   log("<<<updaterInit", "updt", "info");
 }
 
-function isEmpty(object) {
-  return (JSON.stringify(object) === '{}');
-}
-
 async function getServiceSuffixes(service) {
   log("getServiceSuffixes: service = " + service, "updt", "info");
 
   const baseDir = "/home/pi/" + service + "-";
   // e.g.: /home/pi/iipzy-sentinel-admin-",
   log("getServiceSuffixes: baseDir = " + baseDir, "updt", "info");
-  const stat_a = await fileStatAsync(baseDir + "a");
-  log("getServiceSuffixes - stat_a: " + JSON.stringify(stat_a, null, 2), "updt", "info");
-  const stat_b = await fileStatAsync(baseDir + "b");
-  log("getServiceSuffixes - stat_b: " + JSON.stringify(stat_b, null, 2), "updt", "info");
   let stat_a_timestampEpoch = 0;
-  if (!isEmpty(stat_a)) stat_a_timestampEpoch = stat_a.birthtimeMs;
   let stat_b_timestampEpoch = 0;
-  if (!isEmpty(stat_b)) stat_b_timestampEpoch = stat_b.birthtimeMs;
+  if (await fileExistsAsync(baseDir + "a")) {
+    const stat_a = await fileStatAsync(baseDir + "a");
+    log("getServiceSuffixes - stat_a: " + JSON.stringify(stat_a, null, 2), "updt", "info");
+    stat_a_timestampEpoch = stat_a.birthtimeMs;
+  }
+  if (await fileExistsAsync(baseDir + "b")) {
+    const stat_b = await fileStatAsync(baseDir + "b");
+    log("getServiceSuffixes - stat_b: " + JSON.stringify(stat_b, null, 2), "updt", "info");
+    stat_b_timestampEpoch = stat_a.birthtimeMs;
+  }
   log("getServiceSuffixes: a_ts = " + stat_a_timestampEpoch + ", b_ts = " + stat_b_timestampEpoch, "updt", "info");
   return {
+    // NB: cur is newest.
     curServiceSuffix : (stat_a_timestampEpoch > stat_b_timestampEpoch) ? "a" : "b",
+    // NB: next is oldest.
     nextServiceSuffix : (stat_a_timestampEpoch > stat_b_timestampEpoch) ? "b" : "a"
   }
 }

@@ -3,12 +3,12 @@ iipzy-updater.
   For updating iipzy npm modules.
 
   There are eight iipzy related folders under the /home/pi directory:
+    iipzy-core-a
+    iipzy-core-b
     iipzy-sentinel-admin-a
     iipzy-sentinel-admin-b
     iipzy-sentinel-web-a
     iipzy-sentinel-web-b
-    iipzy-service-a
-    iipzy-service-b
     iipzy-updater-a
     iipzy-updater-b
 
@@ -20,8 +20,8 @@ iipzy-updater.
     iipzy-sentinel-admin-b.service
     iipzy-sentinel-web-a.service
     iipzy-sentinel-web-b.service
-    iipzy-pi-a.service
-    iipzy-p-b.service
+    iipzy-core-a.service
+    iipzy-core-b.service
     iipzy-updater-a.service
     iipzy-updater-b.service
 
@@ -37,26 +37,26 @@ iipzy-updater.
 
     2.  The contents of the folder selected for installation is removed, and a new, empty, folder is created in its place.  
         
-        For sake of discussion, let's say iipzy-service-b is the folder where the install takes place.
+        For sake of discussion, let's say iipzy-core-b is the folder where the install takes place.
 
     3.  Using credentials returned in the updater-heartbeat response, updater git clones the following folders:
-          cd ~/iipzy-service-b
+          cd ~/iipzy-core-b
           git clone http://.../iipzy-shared.git
-          git clone http://.../iipzy-pi.git
+          git clone http://.../iipzy-core.git
 
     4.  The two new folders are npm installed
-          cd ~/iipzy-service-b/iipzy-shared
+          cd ~/iipzy-core-b/iipzy-shared
           npm i
-          cd ~/iipzy-service-b/iipzy-pi
+          cd ~/iipzy-core-b/iipzy-core
           npm i
 
-    5.  The currenty running iipzy-pi service is stopped and disabled
+    5.  The currenty running iipzy-core service is stopped and disabled
 
-          systemctl stop iipzy-pi-a
+          systemctl stop iipzy-core-a
 
-    6.  The newly installed iipzy-pi service is enabled and started
+    6.  The newly installed iipzy-core service is enabled and started
 
-          systemctl start iipzy-pi-b
+          systemctl start iipzy-core-b
 
     7.  If the update fails, the service for the newly installed version is stopped and disabled.  
         The service for the previous version is enabled and started.

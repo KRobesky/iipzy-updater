@@ -71,7 +71,7 @@ async function getServiceSuffixes(service) {
   if (await fileExistsAsync(baseDir + "b")) {
     const stat_b = await fileStatAsync(baseDir + "b");
     log("getServiceSuffixes - stat_b: " + JSON.stringify(stat_b, null, 2), "updt", "info");
-    stat_b_timestampEpoch = stat_a.birthtimeMs;
+    stat_b_timestampEpoch = stat_b.birthtimeMs;
   }
   log("getServiceSuffixes: a_ts = " + stat_a_timestampEpoch + ", b_ts = " + stat_b_timestampEpoch, "updt", "info");
   return {
@@ -90,16 +90,16 @@ async function getServiceVersionInfo(service, modules) {
   let updateTime = null;
 
   try{
-  const suffixes = await getServiceSuffixes(service);
+    const suffixes = await getServiceSuffixes(service);
     log("getServiceVersionInfo: suffixes = " + JSON.stringify(suffixes));
 
     const baseDir = "/home/pi/" + service + "-" + suffixes.curServiceSuffix + "/";
     log("getServiceVersionInfo: baseDir = " + baseDir, "updt", "info");
-    // e.g. /home/pi/iipzy-service-a
+    // e.g. /home/pi/iipzy-core-a
 
     for (let i = 0; i < modules.length; i++) {
       const modulePath = baseDir + modules[i] + "/package.json";
-      //e.g.,  /home/pi/iipzy-service-a/iipzy-pi/packages.json
+      //e.g.,  /home/pi/iipzy-core-a/iipzy-core/packages.json
       log("getServiceVersionInfo: modulePath = " + modulePath, "updt", "info");  
       
       const packageDotJson = JSON.parse(await fileReadAsync(modulePath));
@@ -132,7 +132,7 @@ async function getServiceVersionInfo(service, modules) {
 async function getIipzyPiVersionInfo() {
   log("getIipzyPiVersionInfo", "updt", "info");
    // iipzy Sentinel
-  return await getServiceVersionInfo("iipzy-service", ["iipzy-pi", "iipzy-shared"]);
+  return await getServiceVersionInfo("iipzy-core", ["iipzy-core", "iipzy-shared"]);
 }
 
 async function getIipzySentinelAdminVersionInfo() {
@@ -230,10 +230,10 @@ async function setUpdateStatusFailed() {
 async function updateIipzyPi(credentials) {
   return await updateHelper(
     credentials,
-    "iipzy-pi",
-    "iipzyPiSuffix",
-    "/home/pi/iipzy-service-",
-    ["iipzy-shared", "iipzy-pi"],
+    "iipzy-core",
+    "iipzyCoreSuffix",
+    "/home/pi/iipzy-core-",
+    ["iipzy-shared", "iipzy-core"],
     async serviceSuffix => {
       versionInfo.iipzyPi = await getIipzyPiVersionInfo(serviceSuffix);
     }
@@ -298,7 +298,7 @@ async function updateIipzyUpdater(credentials) {
 }
 
 /*
-  modules = ["iipzy-shared", "iipzy-pi"]
+  modules = ["iipzy-shared", "iipzy-core"]
 */
 
 async function updateHelper(
@@ -459,7 +459,7 @@ async function updateHelper(
   /*
   [
     "cp",
-    "/home/pi/iipzy-service-a/src/extraResources/iipzy-pi-a.service",
+    "/home/pi/iipzy-core-a/src/extraResources/iipzy-core-a.service",
     "/etc/systemd/system/."
   ],
     (options = {});
@@ -592,7 +592,7 @@ async function update(updateParams) {
   await sendUpdateStatus();
 
   switch (updateParams.updateType) {
-    case "iipzy-pi": {
+    case "iipzy-core": {
       await updateIipzyPi(updateParams.credentials);
       break;
     }

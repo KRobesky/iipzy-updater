@@ -5,6 +5,7 @@ const { spawn } = require("child_process");
 const { ConfigFile } = require("iipzy-shared/src/utils/configFile");
 const Defs = require("iipzy-shared/src/defs");
 const {
+  fileDeleteAsync,
   fileExistsAsync,
   fileReadAsync,
   fileStatAsync
@@ -13,6 +14,7 @@ const { get_os_id } = require("iipzy-shared/src/utils/globals");
 const http = require("iipzy-shared/src/services/httpService");
 const { log } = require("iipzy-shared/src/utils/logFile");
 const { sleep } = require("iipzy-shared/src/utils/utils");
+//const { spawnAsync } = require("iipzy-shared/src/utils/spawnAsync");
 
 let configFile = null;
 
@@ -20,6 +22,7 @@ let exec = null;
 let execTimeout = null;
 let execError = "";
 let updateStatus = { inProgress: false, step: "done", failed: false };
+let dcPassword = "";
 let os_id = "";
 
 let versionInfo = {
@@ -29,8 +32,10 @@ let versionInfo = {
   iipzyUpdater: {}
 };
 
-async function updaterInit() {
+async function updaterInit(configFile) {
   log(">>>updaterInit", "updt", "info");
+
+  dcPassword = configFile.get("dcPassword");
 
     /*
   configFile = new ConfigFile(
@@ -46,6 +51,7 @@ async function updaterInit() {
   versionInfo.iipzyPi = await getIipzyPiVersionInfo();
   versionInfo.iipzySentinelAdmin = await getIipzySentinelAdminVersionInfo();
   versionInfo.iipzySentinelWeb = await getIipzySentinelWebVersionInfo();
+  versionInfo.iipzySentinelTrafficControl = await getIipzySentinelTrafficControlVersionInfo()
   versionInfo.iipzyUpdater = await getIipzyUpdaterVersionInfo();
   log("updaterInit: " + JSON.stringify(versionInfo, null, 2), "updt", "info");
 
@@ -128,7 +134,6 @@ async function getServiceVersionInfo(service, modules) {
   };
 }
 
-
 async function getIipzyPiVersionInfo() {
   log("getIipzyPiVersionInfo", "updt", "info");
    // iipzy Sentinel
@@ -145,6 +150,18 @@ async function getIipzySentinelWebVersionInfo() {
   log("getIipzySentinelWebVersionInfo", "updt", "info");
   // iipzySentinelWeb
   return await getServiceVersionInfo("iipzy-sentinel-web", ["iipzy-sentinel-web", "iipzy-shared"]);
+}
+
+async function getIipzySentinelWebClientProxyVersionInfo() {
+  log("getIipzySentinelWebClientProxyVersionInfo", "updt", "info");
+  // iipzySentinelWebClientProxy
+  return await getServiceVersionInfo("iipzy-sentinel-web-client-proxy", ["iipzy-sentinel-web-client-proxy", "iipzy-shared"]);
+}
+
+async function getIipzySentinelTrafficControlVersionInfo() {
+  log("getIipzySentinelTrafficControlVersionInfo", "updt", "info");
+  // iipzySentinelTrafficControl
+  return await getServiceVersionInfo("iipzy-tc", ["iipzy-tc", "iipzy-shared"]);
 }
 
 async function getIipzyUpdaterVersionInfo(serviceSuffix) {
@@ -231,7 +248,6 @@ async function updateIipzyPi(credentials) {
   return await updateHelper(
     credentials,
     "iipzy-core",
-    "iipzyCoreSuffix",
     "/home/pi/iipzy-core-",
     ["iipzy-shared", "iipzy-core"],
     async serviceSuffix => {
@@ -244,7 +260,6 @@ async function updateIipzySentinelAdmin(credentials) {
   return await updateHelper(
     credentials,
     "iipzy-sentinel-admin",
-    "iipzySentinelAdminSuffix",
     "/home/pi/iipzy-sentinel-admin-",
     ["iipzy-shared", "iipzy-sentinel-admin"],
     async serviceSuffix => {
@@ -256,19 +271,9 @@ async function updateIipzySentinelAdmin(credentials) {
 }
 
 async function updateIipzySentinelWeb(credentials) {
-  /*
-  // install serve if necessary.
-  if (!(await fileExistsAsync("/usr/bin/serve"))) {
-    setUpdateStatus("installing serve");
-    if (!(await doExec("sudo", ["npm", "i", "serve", "-g"], {}, 40)))
-      return setUpdateStatusFailed();
-  }
-  */
-
   return await updateHelper(
     credentials,
     "iipzy-sentinel-web",
-    "iipzySentinelWebSuffix",
     "/home/pi/iipzy-sentinel-web-",
     ["iipzy-sentinel-web"],
     async serviceSuffix => {
@@ -276,7 +281,36 @@ async function updateIipzySentinelWeb(credentials) {
         serviceSuffix
       );
     },
-    true // skipNpmInit
+    UH_FLAG_SKIP_NPM_INIT
+  );
+}
+
+async function updateIipzySentinelClientWebProxy(credentials) {
+  return await updateHelper(
+    credentials,
+    "iipzy-sentinel-web-client-proxy",
+    "/home/pi/iipzy-sentinel-web-client-proxy-",
+    ["iipzy-sentinel-web-client-proxy"],
+    async serviceSuffix => {
+      versionInfo.iipzySentinelWeb = await getIipzySentinelWebClientProxyVersionInfo(
+        serviceSuffix
+      );
+    }
+  );
+}
+
+async function updateIipzySentinelTrafficControl(credentials) {
+  return await updateHelper(
+    credentials,
+    "iipzy-tc",
+    "/home/pi/iipzy-tc-",
+    ["iipzy-shared", "iipzy-tc"],
+    async serviceSuffix => {
+      versionInfo.iipzySentinelAdmin = await getIipzySentinelTrafficControlVersionInfo(
+        serviceSuffix
+      );
+    },
+    UH_FLAG_ENCRYPTED
   );
 }
 
@@ -284,7 +318,6 @@ async function updateIipzyUpdater(credentials) {
   return await updateHelper(
     credentials,
     "iipzy-updater",
-    "iipzyUpdaterSuffix",
     "/home/pi/iipzy-updater-",
     ["iipzy-shared", "iipzy-updater"],
     async serviceSuffix => {
@@ -292,8 +325,7 @@ async function updateIipzyUpdater(credentials) {
         serviceSuffix
       );
     },
-    false,
-    true // seppukuStopOldService
+    UH_FLAG_SEPPUKU
   );
 }
 
@@ -301,32 +333,32 @@ async function updateIipzyUpdater(credentials) {
   modules = ["iipzy-shared", "iipzy-core"]
 */
 
+const UH_FLAG_NOOP          = 0;
+const UH_FLAG_SKIP_NPM_INIT = 1;
+const UH_FLAG_SEPPUKU       = 2;
+const UH_FLAG_ENCRYPTED     = 4;
+
 async function updateHelper(
   credentials,
   serviceName,
-  configFileKey,
   baseDir_,
   modules,
   updateVersionInfoCB,
-  skipNpmInit,
-  seppukuStopOldService
+  flag
 ) {
   log(
-    "updateHelper " +
-      serviceName +
-      " - credentials: " +
-      credentials +
-      ", configKey: " +
-      configFileKey +
-      ", baseDir: " +
-      baseDir_ +
-      ", modules: " +
-      JSON.stringify(modules) +
-      ", seppuku: " +
-      seppukuStopOldService,
+    "updateHelper " + serviceName +
+      " - credentials: " + credentials +
+      ", baseDir: " + baseDir_ +
+      ", modules: " + JSON.stringify(modules) +
+      ", flag: " + flag,
     "updt",
     "info"
   );
+
+  const skipNpmInit = (flag & UH_FLAG_SKIP_NPM_INIT) !== 0;
+  const seppukuStopOldService = (flag & UH_FLAG_SEPPUKU) != 0;
+  const encrypted = (flag & UH_FLAG_ENCRYPTED) != 0;
 
   // determine target of update
   const suffixes = await getServiceSuffixes(serviceName);
@@ -373,6 +405,35 @@ async function updateHelper(
     )
       return await setUpdateStatusFailed();
 
+    if (encrypted && module !== "iipzy-shared") {
+      // decrypt
+      if (
+        !(await doExec(
+          "node",
+          ["/home/pi/iipzy-encrypt-a/iipzy-encrypt/src/index.js", "-d",  "-in",  "src.sec", "-out",  "src.tar", "-p", dcPassword],
+          {
+            cwd: baseDir + "/" + module
+          },
+          5
+        ))
+      )
+        return await setUpdateStatusFailed();
+      // untar
+      if (
+        !(await doExec(
+          "tar",
+          ["-xvf", "src.tar"],
+          {
+            cwd: baseDir + "/" + module
+          },
+          5
+        ))
+      )
+        return await setUpdateStatusFailed();
+      await fileDeleteAsync(baseDir + "/" + module + "/src.sec");
+      await fileDeleteAsync(baseDir + "/" + module + "/src.tar");
+    }
+
     // disable package-lock
     await setUpdateStatus("disabling " + module + " package-lock");
     if (
@@ -397,7 +458,7 @@ async function updateHelper(
           {
             cwd: baseDir + "/" + module
           },
-          40
+          180
         ))
       )
         return await setUpdateStatusFailed();
@@ -541,11 +602,6 @@ async function updateHelper(
     return await setUpdateStatusFailed();
   }
 
-  /*
-  // update config file
-  await configFile.set(configFileKey, newServiceSuffix);
-  */
-
   await updateVersionInfoCB(newServiceSuffix);
 
   await sendUpdateVersionInfo();
@@ -602,6 +658,14 @@ async function update(updateParams) {
     }
     case "iipzy-sentinel-web": {
       await updateIipzySentinelWeb(updateParams.credentials);
+      break;
+    }
+    case "iipzy-sentinel-web-proxy": {
+      await updateIipzySentinelClientWebProxy(updateParams.credentials);
+      break;
+    }
+    case "iipzy-sentinel-traffic-control": {
+      await updateIipzySentinelTrafficControl(updateParams.credentials);
       break;
     }
     case "iipzy-updater": {

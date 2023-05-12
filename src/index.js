@@ -155,7 +155,7 @@ async function main() {
 
   await updaterHeartbeatInit(configFile);
 
-  await updaterInit();
+  await updaterInit(configFile);
   
   createServer();
 }

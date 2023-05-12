@@ -26,9 +26,11 @@ let dcPassword = "";
 let os_id = "";
 
 let versionInfo = {
-  iipzyPi: {},
+  iipzyCore: {},
   iipzySentinelAdmin: {},
+  iipzySentinelTrafficControl: {},
   iipzySentinelWeb: {},
+  iipzySentinelWebClientProxy: {},
   iipzyUpdater: {}
 };
 
@@ -48,10 +50,11 @@ async function updaterInit(configFile) {
 
   os_id = get_os_id();
 
-  versionInfo.iipzyPi = await getIipzyPiVersionInfo();
+  versionInfo.iipzyCore = await getIipzyCoreVersionInfo();
   versionInfo.iipzySentinelAdmin = await getIipzySentinelAdminVersionInfo();
-  versionInfo.iipzySentinelWeb = await getIipzySentinelWebVersionInfo();
   versionInfo.iipzySentinelTrafficControl = await getIipzySentinelTrafficControlVersionInfo()
+  versionInfo.iipzySentinelWeb = await getIipzySentinelWebVersionInfo();
+  versionInfo.iipzySentinelWebClientProxy = await getIipzySentinelWebClientProxyVersionInfo(); 
   versionInfo.iipzyUpdater = await getIipzyUpdaterVersionInfo();
   log("updaterInit: " + JSON.stringify(versionInfo, null, 2), "updt", "info");
 
@@ -134,8 +137,8 @@ async function getServiceVersionInfo(service, modules) {
   };
 }
 
-async function getIipzyPiVersionInfo() {
-  log("getIipzyPiVersionInfo", "updt", "info");
+async function getIipzyCoreVersionInfo() {
+  log("getIipzyCoreVersionInfo", "updt", "info");
    // iipzy Sentinel
   return await getServiceVersionInfo("iipzy-core", ["iipzy-core", "iipzy-shared"]);
 }
@@ -244,14 +247,14 @@ async function setUpdateStatusFailed() {
   await sendUpdateStatus();
 }
 
-async function updateIipzyPi(credentials) {
+async function updateIipzyCore(credentials) {
   return await updateHelper(
     credentials,
     "iipzy-core",
     "/home/pi/iipzy-core-",
     ["iipzy-shared", "iipzy-core"],
     async serviceSuffix => {
-      versionInfo.iipzyPi = await getIipzyPiVersionInfo(serviceSuffix);
+      versionInfo.iipzyCore = await getIipzyCoreVersionInfo(serviceSuffix);
     }
   );
 }
@@ -649,7 +652,7 @@ async function update(updateParams) {
 
   switch (updateParams.updateType) {
     case "iipzy-core": {
-      await updateIipzyPi(updateParams.credentials);
+      await updateIipzyCore(updateParams.credentials);
       break;
     }
     case "iipzy-sentinel-admin": {

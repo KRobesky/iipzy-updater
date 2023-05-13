@@ -293,7 +293,7 @@ async function updateIipzySentinelClientWebProxy(credentials) {
     credentials,
     "iipzy-sentinel-web-client-proxy",
     "/home/pi/iipzy-sentinel-web-client-proxy-",
-    ["iipzy-sentinel-web-client-proxy"],
+    ["iipzy-shared", "iipzy-sentinel-web-client-proxy"],
     async serviceSuffix => {
       versionInfo.iipzySentinelWeb = await getIipzySentinelWebClientProxyVersionInfo(
         serviceSuffix

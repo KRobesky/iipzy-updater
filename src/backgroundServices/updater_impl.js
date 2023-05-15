@@ -26,12 +26,12 @@ let dcPassword = "";
 let os_id = "";
 
 let versionInfo = {
-  iipzyCore: {},
-  iipzySentinelAdmin: {},
-  iipzySentinelTrafficControl: {},
-  iipzySentinelWeb: {},
-  iipzySentinelWebClientProxy: {},
-  iipzyUpdater: {}
+  core: {},
+  admin: {},
+  traffic_control: {},
+  web: {},
+  web_client_proxy: {},
+  updater: {}
 };
 
 async function updaterInit(configFile) {

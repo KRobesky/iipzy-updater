@@ -50,12 +50,12 @@ async function updaterInit(configFile) {
 
   os_id = get_os_id();
 
-  versionInfo.iipzyCore = await getIipzyCoreVersionInfo();
-  versionInfo.iipzySentinelAdmin = await getIipzySentinelAdminVersionInfo();
-  versionInfo.iipzySentinelTrafficControl = await getIipzySentinelTrafficControlVersionInfo()
-  versionInfo.iipzySentinelWeb = await getIipzySentinelWebVersionInfo();
-  versionInfo.iipzySentinelWebClientProxy = await getIipzySentinelWebClientProxyVersionInfo(); 
-  versionInfo.iipzyUpdater = await getIipzyUpdaterVersionInfo();
+  versionInfo.core = await getIipzyCoreVersionInfo();
+  versionInfo.admin = await getIipzySentinelAdminVersionInfo();
+  versionInfo.traffic_control = await getIipzySentinelTrafficControlVersionInfo()
+  versionInfo.web = await getIipzySentinelWebVersionInfo();
+  versionInfo.web_client_proxy = await getIipzySentinelWebClientProxyVersionInfo(); 
+  versionInfo.updater = await getIipzyUpdaterVersionInfo();
   log("updaterInit: " + JSON.stringify(versionInfo, null, 2), "updt", "info");
 
   await sendUpdateVersionInfo();
